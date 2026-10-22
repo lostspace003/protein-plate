@@ -26,11 +26,11 @@
     localStorage.removeItem(STORE_KEY);
   }
   function normalizeEndpoint(ep) {
-    let e = (ep || "").trim().replace(/\/+$/, "");
-    e = e.replace(/\/openai\/v1(\/responses)?$/i, "").replace(/\/openai$/i, "");
-    // Accept project endpoints like https://x.services.ai.azure.com/api/projects/p -> use resource root
-    e = e.replace(/\/api\/projects\/[^/]+$/i, "");
-    return e;
+    // Accept any pasted Foundry URL (resource endpoint, project endpoint, full "Target URI"
+    // with /openai/deployments/...?... etc.) and reduce it to the resource origin.
+    const raw = (ep || "").trim();
+    try { return new URL(raw).origin; }
+    catch { return raw.replace(/\/+$/, ""); }
   }
   function responsesUrl(conn) {
     return `${normalizeEndpoint(conn.endpoint)}/openai/v1/responses`;
@@ -210,6 +210,16 @@ Rules:
     return out;
   }
 
+  function friendlyError(status, data, conn) {
+    const msg = data?.error?.message || data?.message || "";
+    let hint = "";
+    if (status === 401) hint = "Check the API key (Key 1/Key 2 of the same resource as the endpoint).";
+    else if (status === 404) hint = `Check the deployment name "${conn.deployment}" exactly matches your deployment in Foundry, and that the endpoint is that resource.`;
+    else if (status === 403) hint = "The resource may block public network access or your IP.";
+    else if (status === 429) hint = "Rate limit/quota hit. Wait and retry, or raise the deployment's TPM.";
+    return `Foundry returned ${status}: ${msg || "error"}${hint ? " — " + hint : ""}`;
+  }
+
   async function callFoundry(input, effort) {
     const conn = loadConn();
     if (!conn || !conn.apiKey || !conn.endpoint || !conn.deployment) {
@@ -237,10 +247,7 @@ Rules:
       throw new Error(`Network/CORS error calling ${responsesUrl(conn)}. Check the endpoint URL and that the resource allows public network access. (${e.message})`);
     }
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const msg = data?.error?.message || res.statusText;
-      throw new Error(`Foundry returned ${res.status}: ${msg}`);
-    }
+    if (!res.ok) throw new Error(friendlyError(res.status, data, conn));
     if (data.status === "incomplete") {
       throw new Error(`Response incomplete (${data.incomplete_details?.reason || "unknown"}). Try lower reasoning effort.`);
     }
@@ -405,7 +412,7 @@ Rules:
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) $("testResult").innerHTML = `✅ Connected. Model: <code>${esc(data.model || c.deployment)}</code>`;
-      else $("testResult").textContent = `❌ ${res.status}: ${data?.error?.message || res.statusText}`;
+      else $("testResult").textContent = `❌ ${friendlyError(res.status, data, c)}`;
     } catch (e) {
       $("testResult").textContent = `❌ Network/CORS error: ${e.message}`;
     }
