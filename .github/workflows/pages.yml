@@ -3,6 +3,8 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -11,20 +13,25 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configure Pages
+      - name: Validate site files
+        run: |
+          for f in index.html styles.css app.js; do
+            test -s "$f" || { echo "::error::$f missing"; exit 1; }
+          done
+          node --check app.js
+          echo "Site files OK"
+
+      - name: Configure Pages (fails if Pages source is not set to GitHub Actions)
         uses: actions/configure-pages@v5
 
       - name: Prepare site
@@ -37,6 +44,14 @@ jobs:
         with:
           path: _site
 
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
