@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ProteinPlate – AI Daily Protein & Menu Planner</title>
+  <meta name="description" content="Calculate your daily protein requirement and get an AI-generated food menu powered by Microsoft Foundry gpt-5.4." />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">🥗 <span>ProteinPlate</span></div>
+    <button id="openSettings" class="btn ghost" type="button">⚙️ Foundry Settings</button>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <h1>Your daily protein, planned by AI</h1>
+      <p>Tell us about yourself, we calculate your protein target, and <strong>Microsoft Foundry gpt-5.4</strong> builds a menu that hits it.</p>
+      <div id="connBanner" class="banner warn">Foundry connection not configured. Click <strong>⚙️ Foundry Settings</strong> to add your endpoint, deployment and API key.</div>
+    </section>
+
+    <!-- Step 1: Profile -->
+    <section class="card">
+      <h2><span class="step">1</span> About you</h2>
+      <form id="profileForm" novalidate>
+        <div class="grid">
+          <label>Age (years)
+            <input type="number" id="age" min="14" max="100" value="30" required />
+          </label>
+          <label>Sex
+            <select id="sex">
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+            </select>
+          </label>
+          <label>Weight
+            <div class="inline">
+              <input type="number" id="weight" min="25" max="350" step="0.1" value="70" required />
+              <select id="weightUnit"><option value="kg">kg</option><option value="lb">lb</option></select>
+            </div>
+          </label>
+          <label>Height (cm)
+            <input type="number" id="height" min="100" max="250" value="170" required />
+          </label>
+          <label>Activity level
+            <select id="activity">
+              <option value="sedentary">Sedentary (desk job, little exercise)</option>
+              <option value="light">Lightly active (1–3 workouts/week)</option>
+              <option value="moderate" selected>Moderately active (3–5 workouts/week)</option>
+              <option value="very">Very active (6–7 workouts/week)</option>
+              <option value="athlete">Athlete / heavy strength training</option>
+            </select>
+          </label>
+          <label>Goal
+            <select id="goal">
+              <option value="maintain">Maintain / general health</option>
+              <option value="lose">Lose fat (preserve muscle)</option>
+              <option value="gain">Build muscle</option>
+            </select>
+          </label>
+          <label>Special condition
+            <select id="condition">
+              <option value="none">None</option>
+              <option value="pregnant">Pregnant</option>
+              <option value="lactating">Breastfeeding</option>
+              <option value="kidney">Kidney disease (consult doctor)</option>
+            </select>
+          </label>
+        </div>
+
+        <h3>Food preferences</h3>
+        <div class="grid">
+          <label>Diet type
+            <select id="diet">
+              <option value="vegetarian">Vegetarian (dairy OK)</option>
+              <option value="eggetarian">Eggetarian (veg + eggs)</option>
+              <option value="non-vegetarian" selected>Non-vegetarian</option>
+              <option value="pescatarian">Pescatarian</option>
+              <option value="vegan">Vegan</option>
+            </select>
+          </label>
+          <label>Cuisine preference
+            <input type="text" id="cuisine" placeholder="e.g. Indian, Mediterranean" value="Indian" />
+          </label>
+          <label>Meals per day
+            <select id="meals">
+              <option>3</option><option selected>4</option><option>5</option><option>6</option>
+            </select>
+          </label>
+          <label>Budget
+            <select id="budget">
+              <option value="low">Budget-friendly</option>
+              <option value="medium" selected>Moderate</option>
+              <option value="high">No constraint</option>
+            </select>
+          </label>
+          <label>Max cooking time per meal
+            <select id="cookTime">
+              <option value="10">10 min</option>
+              <option value="20">20 min</option>
+              <option value="30" selected>30 min</option>
+              <option value="60">60 min</option>
+            </select>
+          </label>
+          <label>Allergies / intolerances
+            <input type="text" id="allergies" placeholder="e.g. lactose, peanuts" />
+          </label>
+          <label class="span2">Foods you dislike or other notes
+            <input type="text" id="notes" placeholder="e.g. no mushrooms, I work night shifts" />
+          </label>
+        </div>
+        <div class="actions">
+          <button type="submit" class="btn primary">Calculate my protein target</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Step 2: Target -->
+    <section class="card hidden" id="targetCard">
+      <h2><span class="step">2</span> Your daily protein target</h2>
+      <div class="target">
+        <div class="bignum"><span id="targetValue">0</span><small> g/day</small></div>
+        <div id="targetExplain" class="muted"></div>
+      </div>
+      <div class="grid">
+        <label>Adjust target manually (optional)
+          <input type="number" id="targetOverride" min="20" max="400" />
+        </label>
+        <label>Reasoning effort
+          <select id="effort">
+            <option value="low" selected>Low (fastest)</option>
+            <option value="medium">Medium</option>
+            <option value="high">High (most thorough)</option>
+          </select>
+        </label>
+      </div>
+      <div class="actions">
+        <button id="buildMenu" class="btn primary" type="button">🍽️ Build my menu with gpt-5.4</button>
+      </div>
+    </section>
+
+    <!-- Step 3: Menu -->
+    <section class="card hidden" id="menuCard">
+      <h2><span class="step">3</span> Your protein menu</h2>
+      <div id="status" class="status hidden"></div>
+      <div id="menuOutput"></div>
+
+      <div id="refineBox" class="refine hidden">
+        <h3>Tweak the menu</h3>
+        <div class="inline">
+          <input type="text" id="refineInput" placeholder="e.g. Swap breakfast for something without eggs, add a post-workout shake" />
+          <button id="refineBtn" class="btn" type="button">Update</button>
+        </div>
+        <div class="actions">
+          <button id="copyBtn" class="btn ghost" type="button">📋 Copy menu</button>
+          <button id="printBtn" class="btn ghost" type="button">🖨️ Print</button>
+        </div>
+      </div>
+    </section>
+
+    <p class="disclaimer">ℹ️ Estimates are for general wellness and are not medical advice. Consult a doctor or registered dietitian, especially if you have kidney disease, are pregnant, or have other medical conditions.</p>
+  </main>
+
+  <!-- Settings dialog -->
+  <dialog id="settingsDialog">
+    <form method="dialog" id="settingsForm">
+      <h2>Microsoft Foundry connection</h2>
+      <p class="muted small">Your key is kept <strong>only in this browser</strong> and is sent directly to your Foundry endpoint. It is never stored in the repository.</p>
+      <label>Endpoint
+        <input type="url" id="endpoint" placeholder="https://YOUR-RESOURCE.openai.azure.com" required />
+      </label>
+      <label>Deployment name
+        <input type="text" id="deployment" placeholder="gpt-5.4" value="gpt-5.4" required />
+      </label>
+      <label>API key
+        <input type="password" id="apiKey" autocomplete="off" placeholder="Paste your Foundry API key" required />
+      </label>
+      <label class="check"><input type="checkbox" id="remember" /> Remember on this device (localStorage). Unchecked = cleared when tab closes.</label>
+      <div id="testResult" class="small"></div>
+      <div class="actions">
+        <button type="button" id="testConn" class="btn">Test connection</button>
+        <button type="button" id="clearConn" class="btn ghost">Clear</button>
+        <button type="submit" value="cancel" class="btn ghost">Close</button>
+        <button type="button" id="saveConn" class="btn primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <footer class="footer">Built with Microsoft Foundry (Azure OpenAI Responses API) · Hosted on GitHub Pages</footer>
+  <script src="app.js"></script>
+</body>
+</html>
